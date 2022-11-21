@@ -1,14 +1,14 @@
 import './plugin.scss';
-import mustache from 'mustache';
-import template from './plugin.hbs';
+import view from './plugin.view.js';
 import Page from "../../components/page";
 import ajax from '@deadlyjack/ajax';
-import helpers from '../../lib/utils/helpers';
+import helpers from '../../utils/helpers';
 import { marked } from 'marked';
-import Url from '../../lib/utils/Url';
+import Url from '../../utils/Url';
 import installPlugin from '../../lib/installPlugin';
-import fsOperation from '../../lib/fileSystem/fsOperation';
-import tag from 'html-tag-js';
+import fsOperation from '../../fileSystem/fsOperation';
+import constants from '../../lib/constants';
+import dialogs from '../../components/dialogs';
 
 export default async function PluginInclude(json, installed = false, onInstall, onUninstall) {
   const $page = Page('Plugin');
@@ -43,7 +43,7 @@ export default async function PluginInclude(json, installed = false, onInstall, 
   try {
     const promises = [];
     let pluginJson = '';
-    if (installed) {
+    if (installed && json.startsWith('file:')) {
       promises.push(
         fsOperation(json).readFile('utf8'),
         fsOperation(
@@ -56,6 +56,7 @@ export default async function PluginInclude(json, installed = false, onInstall, 
         ajax({
           url: json,
           responseType: 'text',
+          contentType: 'application/x-www-form-urlencoded',
         }),
       );
     }
@@ -75,6 +76,7 @@ export default async function PluginInclude(json, installed = false, onInstall, 
       ajax({
         url: Url.join(host, plugin.readme),
         responseType: 'text',
+        contentType: 'application/x-www-form-urlencoded',
       })
         .then((text) => {
           readme = text;
@@ -82,10 +84,11 @@ export default async function PluginInclude(json, installed = false, onInstall, 
         });
     }
 
-    if (installed) {
+    if (installed && json.startsWith('file:')) {
       ajax({
         url: Url.join(plugin.host, 'plugin.json'),
         responseType: 'text',
+        contentType: 'application/x-www-form-urlencoded',
       }).then((json) => {
         remotePlugin = helpers.parseJSON(json);
         remoteHost = plugin.host;
@@ -109,50 +112,64 @@ export default async function PluginInclude(json, installed = false, onInstall, 
   function handleClick(e) {
     const $target = e.target;
     const action = $target.getAttribute('action');
-    if (action === 'install') {
-      if (!remotePlugin) {
-        toast('Cannot install plugin');
-        return;
-      }
-
-      installPlugin(remotePlugin, remoteHost)
-        .then(() => {
-          acode.unmountPlugin(plugin.id);
-          onInstall(plugin.id);
-          installed = true;
-          update = false;
-          render();
-        })
-        .catch((err) => {
-          helpers.error(err);
-        });
-    }
-    if (action === 'uninstall') {
-      fsOperation(
-        Url.join(PLUGIN_DIR, plugin.id)
-      )
-        .delete()
-        .then(() => {
-          acode.unmountPlugin(plugin.id);
-          onUninstall(plugin.id);
-          installed = false;
-          update = false;
-          render();
-        })
-        .catch((err) => {
-          helpers.error(err);
-        });
-    }
     if (action === 'buy') {
-      system.openInBrowser(
-        'https://play.google.com/store/apps/details?id=com.foxdebug.acode'
-      )
+      system.openInBrowser(constants.PAID_VERSION)
+      return;
     }
   }
 
-  function render() {
+  async function install() {
+    if (!remotePlugin) {
+      toast('Cannot install plugin');
+      return;
+    }
+
+    try {
+      await Promise.all([
+        loadAd(this),
+        installPlugin(remotePlugin, remoteHost),
+      ]);
+      acode.unmountPlugin(plugin.id);
+      if (onInstall) onInstall(plugin.id);
+      installed = true;
+      update = false;
+      if (IS_FREE_VERSION && await window.iad?.isLoaded()) {
+        window.iad.show();
+      }
+      render();
+    } catch (err) {
+      helpers.error(err);
+    }
+  }
+
+  async function uninstall() {
+    try {
+      const pluginDir = Url.join(PLUGIN_DIR, plugin.id);
+      await Promise.all([
+        loadAd(this),
+        fsOperation(pluginDir)
+          .delete(),
+      ]);
+      acode.unmountPlugin(plugin.id);
+      if (onUninstall) onUninstall(plugin.id);
+      installed = false;
+      update = false;
+      if (IS_FREE_VERSION && await window.iad?.isLoaded()) {
+        window.iad.show();
+      }
+      render();
+    } catch (err) {
+      helpers.error(err);
+    }
+  }
+
+  async function render() {
     const isPaid = ['paid', 'premium', 'pro'].includes(plugin.type) && IS_FREE_VERSION;
-    $page.body = tag.parse(mustache.render(template, {
+    if (Url.getProtocol(icon) === 'file:') {
+      icon = await helpers.toInternalUri(icon);
+    }
+
+    $page.content = view({
       ...plugin,
       readme,
       version,
@@ -160,13 +177,23 @@ export default async function PluginInclude(json, installed = false, onInstall, 
       body: readme ? marked(readme) : '',
       installed,
       update,
-      strings,
       isPaid,
-    }));
+      install,
+      uninstall,
+    });
+  }
 
-    if (isPaid) {
-      const $installBtn = $page.get('[action="install"]');
-      if ($installBtn) $installBtn.style.display = 'none';
-    }
+  async function loadAd(el) {
+    if (!IS_FREE_VERSION) return;
+    try {
+      let isAdLoaded = await window.iad?.isLoaded();
+      if (!isAdLoaded) {
+        const oldText = el.textContent;
+        el.textContent = strings['loading...'];
+        await window.iad.load();
+        el.textContent = oldText;
+        isAdLoaded = true;
+      }
+    } catch (error) { }
   }
 }

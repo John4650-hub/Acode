@@ -2,7 +2,7 @@ import 'core-js/stable';
 import 'html-tag-js/dist/polyfill';
 import tag from 'html-tag-js';
 import * as esprima from 'esprima';
-import loadPolyFill from './utils/polyfill';
+import loadPolyFill from '../utils/polyfill';
 
 (function () {
   loadPolyFill.apply(window);
@@ -572,10 +572,14 @@ import loadPolyFill from './utils/polyfill';
    * @param {Error} error 
    * @returns 
    */
-  function getStack(error) {
+  function getStack(error, skip = false) {
     let stack = error.stack.split('\n');
-    stack.splice(1, 1);
+    if (!skip) stack.splice(1, 1);
     let regExecRes = /<(.*)>:(\d+):(\d+)/.exec(stack[1]) || [];
+    if (!regExecRes.length) {
+      const errorInfo = stack[1]?.split('/').pop();
+      regExecRes = /(.+):(\d+):(\d+)/.exec(errorInfo) || [];
+    }
     let src = '';
     const location = regExecRes[1];
     const lineno = regExecRes[2];
@@ -647,7 +651,7 @@ import loadPolyFill from './utils/polyfill';
 
   function onError(err) {
     const error = err.error;
-    log("error", getStack(error), error);
+    log("error", getStack(error, true), error);
   }
 
   function escapeHTML(str) {
