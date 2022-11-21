@@ -18,6 +18,8 @@ jobs:
         node-version: 18
     - run: mkdir -p path/to/artifact
     - run: npm i cordova
+    - run: cordova platform add android
+    - run: ls
     - run: npm install
     - run: yarn build android free p
     
