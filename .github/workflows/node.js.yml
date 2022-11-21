@@ -20,7 +20,7 @@ jobs:
     - run: sudo npm install -g cordova
     - run: sudo cordova platform add android
     - run: ls
-    - run: npm install
+    - run: yarn setup
     - run: yarn build android free p
     
     - uses: actions/upload-artifact@v3
