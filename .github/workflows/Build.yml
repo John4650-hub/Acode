@@ -27,20 +27,11 @@ jobs:
     - run: sudo yarn setup
     - run: sudo yarn build android free p
     - run: ls
-    
-    - uses: mukeshsolanki/bundletool-action@v1.0.0
-      with:
-        aabFile: platforms/android/app/build/outputs/bundle/release/app-release.aab
-        base64Keystore: ${{ secrets.BASE64_KEY }}
-        keystorePassword: ${{ secrets.PASSWORD }}
-        keystoreAlias: ${{ secrets.ALIAS }}
-        keyPassword: ${{ secrets.PASSWORD }}
       
-    
     - uses: actions/upload-artifact@v3
       with:
         name: my-artifact
-        path: ${{ steps.convert_aab.outputs.apkPath }}
+        path: /home/runner/work/Acode/Acode/platforms/android/app/build/outputs/bundle/release/app-release.aab
   
   release:
     name: Release apk
