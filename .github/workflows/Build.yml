@@ -1,0 +1,73 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
+
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main"]
+
+jobs:
+  build_aab:
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 18
+    - run: mkdir -p path/to/artifact
+    - run: sudo npm install -g cordova
+    - run: sudo cordova platform add android
+    - run: ls
+    - uses: actions/setup-java@v3
+      with:
+        distribution: temurin
+        java-version: 11
+    - run: sudo yarn setup
+    - run: sudo yarn build android free p
+    - run: ls
+    
+    - uses: mukeshsolanki/bundletool-action@v1.0.0
+      with:
+        aabFile: platforms/android/app/build/outputs/bundle/release/app-release.aab
+        base64Keystore: ${{ secrets.BASE64_KEY }}
+        keystorePassword: ${{ secrets.PASSWORD }}
+        keystoreAlias: ${{ secrets.ALIAS }}
+        keyPassword: ${{ secrets.PASSWORD }}
+      
+    
+    - uses: actions/upload-artifact@v3
+      with:
+        name: my-artifact
+        path: ${{ steps.convert_aab.outputs.apkPath }}
+  
+  release:
+    name: Release apk
+    needs: build_aab
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download apk from build
+        uses: actions/download-artifact@v1
+        with:
+          name: my-artifact
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TK }}
+        with:
+          tag_name: ${{ github.run_number }}
+          release_name: ${{ github.event.repository.name }} v1.0.0
+
+      - name: upload Release Apk
+        id: upload_release_assets
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TK }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path:  upload_debug_apk/app-debug.apk
+          asset_name: ${{ github.event.repository.name }}.apk
+          asset_content_type: application/zip
