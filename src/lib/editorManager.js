@@ -42,6 +42,7 @@ async function EditorManager($sidebar, $header, $body) {
   };
   const $container = tag('div', { className: 'editor-container' });
   const editor = ace.edit($container);
+  editor.setOptions({keyboardHandler:'ace/keyboard/vim'})
   const $vScrollbar = ScrollBar({
     width: scrollbarSize,
     onscroll: onscrollV,
