@@ -42,7 +42,6 @@ async function EditorManager($sidebar, $header, $body) {
   };
   const $container = tag('div', { className: 'editor-container' });
   const editor = ace.edit($container);
-  editor.setOptions({keyboardHandler:'ace/keyboard/vim'})
   const $vScrollbar = ScrollBar({
     width: scrollbarSize,
     onscroll: onscrollV,
@@ -247,6 +246,7 @@ async function EditorManager($sidebar, $header, $body) {
       showInvisibles: settings.showSpaces,
       indentedSoftWrap: false,
       scrollPastEnd: 0.5,
+      keyboardHandler:'ace/keyboard/vim',
       showPrintMargin: settings.showPrintMargin,
       enableLiveAutocompletion: settings.liveAutoCompletion,
     });
